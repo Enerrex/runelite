@@ -39,15 +39,7 @@ import java.util.Set;
 import java.util.Stack;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
-import net.runelite.api.GameState;
-import net.runelite.api.GroundObject;
-import net.runelite.api.NPC;
-import net.runelite.api.NpcID;
-import net.runelite.api.NullNpcID;
-import net.runelite.api.NullObjectID;
-import net.runelite.api.Perspective;
-import net.runelite.api.WallObject;
+import net.runelite.api.*;
 import net.runelite.api.coords.Angle;
 import net.runelite.api.coords.Direction;
 import net.runelite.api.coords.LocalPoint;
@@ -74,7 +66,6 @@ public class TelekineticRoom extends MTARoom
 	private final Client client;
 
 	private final List<WallObject> telekineticWalls = new ArrayList<>();
-
 	private Stack<Direction> moves = new Stack<>();
 	private LocalPoint destination;
 	private WorldPoint location;
@@ -133,8 +124,8 @@ public class TelekineticRoom extends MTARoom
 	public void onGameTick(GameTick event)
 	{
 		if (!config.telekinetic()
-				|| !inside()
-				|| client.getGameState() != GameState.LOGGED_IN)
+			|| !inside()
+			|| client.getGameState() != GameState.LOGGED_IN)
 		{
 			maze = null;
 			moves.clear();
@@ -220,62 +211,130 @@ public class TelekineticRoom extends MTARoom
 	@Override
 	public void under(Graphics2D graphics2D)
 	{
-		if (inside() && maze != null && guardian != null)
+		// If not inside, we don't have the maze or guardian, do not render
+		if (!inside() || maze == null || guardian == null)
 		{
-			if (destination != null)
+			return;
+		}
+
+		// Guardian is moving to destination
+		if (destination != null)
+		{
+			graphics2D.setColor(Color.orange);
+			renderLocalPoint(graphics2D, destination);
+		}
+
+		if (!moves.isEmpty())
+		{
+			// Target color is GREEN if player is on the correct side
+			Color targetColor = config.getTargetColor();
+			if (moves.peek() == getDirection())
 			{
-				graphics2D.setColor(Color.ORANGE);
-				renderLocalPoint(graphics2D, destination);
+				targetColor = Color.GREEN;
 			}
-			if (!moves.isEmpty())
+
+			// Tile indicator for the guardian should match the target tile color
+			graphics2D.setColor(targetColor);
+			Polygon tile = Perspective.getCanvasTilePoly(client, guardian.getLocalLocation());
+			if (tile != null)
 			{
-				if (moves.peek() == getPosition())
-				{
-					graphics2D.setColor(Color.GREEN);
-				}
-				else
-				{
-					graphics2D.setColor(Color.RED);
-				}
-
-				Polygon tile = Perspective.getCanvasTilePoly(client, guardian.getLocalLocation());
-				if (tile != null)
-				{
-					graphics2D.drawPolygon(tile);
-				}
-
-				WorldPoint optimal = optimal();
-
-				if (optimal != null)
-				{
-					client.setHintArrow(optimal);
-					renderWorldPoint(graphics2D, optimal);
-				}
+				graphics2D.drawPolygon(tile);
 			}
+
+			// Render move step hints, color should already be set to targetColor
+			handleMovesRender(graphics2D);
 		}
 	}
 
-	private WorldPoint optimal()
+	private void handleMovesRender(Graphics2D graphics2D)
 	{
-		WorldPoint current = client.getLocalPlayer().getWorldLocation();
-
-		Direction next = moves.pop();
-		WorldArea areaNext = getIndicatorLine(next);
-		WorldPoint nearestNext = nearest(areaNext, current);
-
-		if (moves.isEmpty())
+		NextTilesResult targetPoints = getNextMoveTiles();
+		if (targetPoints.currentTarget == null)
 		{
-			moves.push(next);
-
-			return nearestNext;
+			return;
 		}
 
-		Direction after = moves.peek();
-		moves.push(next);
-		WorldArea areaAfter = getIndicatorLine(after);
-		WorldPoint nearestAfter = nearest(areaAfter, nearestNext);
+		// Draw the target point
+		renderWorldPoint(graphics2D, targetPoints.currentTarget);
+		client.setHintArrow(targetPoints.currentTarget);
 
-		return nearest(areaNext, nearestAfter);
+		HashSet<WorldPoint> visited = new HashSet<>();
+		visited.add(targetPoints.currentTarget);
+		WorldPoint[] nextPoints = targetPoints.nextTargets;
+		for (int nextPointIx = 0; nextPointIx < nextPoints.length; nextPointIx++)
+		{
+			WorldPoint nextPoint = nextPoints[nextPointIx];
+			// Shouldn't ever have a null at this point, but just in case
+			if (nextPoint == null)
+			{
+				continue;
+			}
+
+			// Don't render the same point twice
+			// Earlier points are more important
+			if (!visited.add(nextPoint))
+			{
+				continue;
+			}
+
+			graphics2D.setColor(config.getFutureTargetColor());
+			if (nextPointIx == 0)
+			{
+				graphics2D.setColor(config.getNextTargetColor());
+			}
+
+			renderWorldPoint(graphics2D, nextPoint);
+			visited.add(nextPoint);
+		}
+	}
+
+	private NextTilesResult getNextMoveTiles()
+	{
+		// Number of points to find - Min of config telekineticSteps and the number of moves left
+		final int pointsToFind = Math.min(this.config.telekineticSteps(), moves.size());
+		// Array that will be filled with the result points
+		WorldPoint[] nextPositions = new WorldPoint[pointsToFind];
+		// Array will hold moves popped off the stack, we push them back on later
+		Direction[] nextMoves = new Direction[pointsToFind];
+
+		// Current player tile point
+		WorldPoint currentPlayerPoint = client.getLocalPlayer().getWorldLocation();
+
+		for (int nextMoveIx = 0; nextMoveIx < nextMoves.length; nextMoveIx++)
+		{
+			Direction next = moves.pop();
+			nextMoves[nextMoveIx] = next;
+
+			WorldArea areaNext = getIndicatorLine(next);
+			WorldPoint nearestNext = nearest(areaNext, currentPlayerPoint);
+
+			// There is no next point, so just use the nearest point to the player
+			if (moves.isEmpty())
+			{
+				nextPositions[nextMoveIx] = nearestNext;
+				break;
+			}
+
+			// There is a next point, find the nearest point to it
+			// E.g. if the player must go to the east side for move N, then the north side for move N + 1,
+			// this will make the player go to the north most point on the east side,
+			// before going to the north side.
+			Direction after = moves.peek();
+
+			WorldArea areaAfter = getIndicatorLine(after);
+			WorldPoint nearestAfter = nearest(areaAfter, nearestNext);
+
+			nextPositions[nextMoveIx] = nearest(areaNext, nearestAfter);
+		}
+
+		// push the moves back onto the stack
+		for (int i = nextMoves.length - 1; i >= 0; i--)
+		{
+			moves.push(nextMoves[i]);
+		}
+
+		// Result object containing the current target and any after that
+		return new NextTilesResult(nextPositions);
 	}
 
 	private static int manhattan(WorldPoint point1, WorldPoint point2)
@@ -365,7 +424,7 @@ public class TelekineticRoom extends MTARoom
 				WorldPoint nghbWorld = WorldPoint.fromLocal(client, neighbour);
 
 				if (!nghbWorld.equals(next)
-						&& !closed.contains(nghbWorld))
+					&& !closed.contains(nghbWorld))
 				{
 					int score = scores.get(next) + 1;
 
@@ -417,10 +476,10 @@ public class TelekineticRoom extends MTARoom
 	private LocalPoint[] neighbours(LocalPoint point)
 	{
 		return new LocalPoint[]
-		{
-			neighbour(point, Direction.NORTH), neighbour(point, Direction.SOUTH),
-			neighbour(point, Direction.EAST), neighbour(point, Direction.WEST)
-		};
+			{
+				neighbour(point, Direction.NORTH), neighbour(point, Direction.SOUTH),
+				neighbour(point, Direction.EAST), neighbour(point, Direction.WEST)
+			};
 	}
 
 	private LocalPoint neighbour(LocalPoint point, Direction direction)
@@ -484,7 +543,11 @@ public class TelekineticRoom extends MTARoom
 		return new Rectangle(minX, minY, maxX - minX, maxY - minY);
 	}
 
-	private Direction getPosition()
+	/**
+	 * @return the direction of the player, i.e. the side they are on as it corresponds to the direction the
+	 * guardian will move.
+	 */
+	private Direction getDirection()
 	{
 		WorldPoint mine = client.getLocalPlayer().getWorldLocation();
 

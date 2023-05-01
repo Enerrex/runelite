@@ -24,40 +24,66 @@
  */
 package net.runelite.client.plugins.mta;
 
+import java.awt.Color;
+import net.runelite.api.Constants;
+import net.runelite.client.config.Alpha;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
+import net.runelite.client.config.ConfigSection;
 
 @ConfigGroup("mta")
 public interface MTAConfig extends Config
 {
+	@ConfigSection(
+		name = "Alchemy",
+		description = "Alchemy room configuration",
+		position = 0
+	)
+	String alchemyRoomSection = "alchemyRoom";
+
 	@ConfigItem(
 		keyName = "alchemy",
-		name = "Enable alchemy room",
+		name = "Enable",
 		description = "Configures whether or not the alchemy room overlay is enabled.",
-		position = 0
+		section = alchemyRoomSection
 	)
 	default boolean alchemy()
 	{
 		return true;
 	}
 
+	@ConfigSection(
+		name = "Graveyard",
+		description = "Graveyard room configuration",
+		position = 1
+	)
+	String graveyardRoomSection = "graveyardRoom";
+
 	@ConfigItem(
 		keyName = "graveyard",
-		name = "Enable graveyard room",
+		name = "Enable",
 		description = "Configures whether or not the graveyard room overlay is enabled.",
-		position = 1
+		section = graveyardRoomSection
 	)
 	default boolean graveyard()
 	{
 		return true;
 	}
 
+	@ConfigSection(
+		name = "Telekinetic",
+		description = "Telekinetic room configuration",
+		position = 2
+	)
+	String telekineticRoomSection = "telekineticRoom";
+
 	@ConfigItem(
 		keyName = "telekinetic",
-		name = "Enable telekinetic room",
+		name = "Enable",
 		description = "Configures whether or not the telekinetic room overlay is enabled.",
-		position = 2
+		section = telekineticRoomSection,
+		position = 0
 	)
 	default boolean telekinetic()
 	{
@@ -65,10 +91,65 @@ public interface MTAConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "enchantment",
-		name = "Enable enchantment room",
-		description = "Configures whether or not the enchantment room overlay is enabled.",
+		keyName = "telekineticSteps",
+		name = "Display #",
+		description = "Configures the number of moves to display.",
+		section = telekineticRoomSection,
+		position = 1
+	)
+	default int telekineticSteps()
+	{
+		return 1;
+	}
+
+	@Alpha
+	@ConfigItem(
+		keyName = "targetColor",
+		name = "Current Target",
+		description = "Color of the current target point.",
+		section = telekineticRoomSection,
+		position = 2
+	)
+	default Color getTargetColor()
+	{
+		return Color.RED;
+	}
+
+	@Alpha
+	@ConfigItem(
+		keyName = "nextTargetColor",
+		name = "Next Target",
+		description = "Color of the next target point.",
+		section = telekineticRoomSection,
+		position = 2
+	)
+	default Color getNextTargetColor()
+	{
+		return Color.ORANGE;
+	}
+
+	@Alpha
+	@ConfigItem(
+		keyName = "futureTargetColor",
+		name = "Future Targets",
+		description = "Color of the future target points.",
+		section = telekineticRoomSection,
+		position = 2
+	)
+	default Color getFutureTargetColor() {return Color.CYAN;}
+
+	@ConfigSection(
+		name = "Enchantment",
+		description = "Enchantment room configuration",
 		position = 3
+	)
+	String enchantmentRoomSection = "enchantmentRoom";
+
+	@ConfigItem(
+		keyName = "enchantment",
+		name = "Enable",
+		description = "Configures whether or not the enchantment room overlay is enabled.",
+		section = enchantmentRoomSection
 	)
 	default boolean enchantment()
 	{
