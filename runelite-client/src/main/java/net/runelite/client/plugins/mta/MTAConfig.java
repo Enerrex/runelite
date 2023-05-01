@@ -25,14 +25,13 @@
 package net.runelite.client.plugins.mta;
 
 import java.awt.Color;
-import net.runelite.api.Constants;
 import net.runelite.client.config.Alpha;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
 
-@ConfigGroup("mta")
+@ConfigGroup(MTAPlugin.MTA_CONFIG_KEY)
 public interface MTAConfig extends Config
 {
 	@ConfigSection(
@@ -136,7 +135,10 @@ public interface MTAConfig extends Config
 		section = telekineticRoomSection,
 		position = 2
 	)
-	default Color getFutureTargetColor() {return Color.CYAN;}
+	default Color getFutureTargetColor()
+	{
+		return Color.CYAN;
+	}
 
 	@ConfigSection(
 		name = "Enchantment",

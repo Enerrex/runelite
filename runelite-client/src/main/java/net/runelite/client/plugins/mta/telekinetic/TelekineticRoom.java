@@ -53,7 +53,9 @@ import net.runelite.api.events.NpcSpawned;
 import net.runelite.api.events.WallObjectSpawned;
 import net.runelite.api.widgets.WidgetID;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.mta.MTAConfig;
+import net.runelite.client.plugins.mta.MTAPlugin;
 import net.runelite.client.plugins.mta.MTARoom;
 
 @Slf4j
@@ -67,6 +69,7 @@ public class TelekineticRoom extends MTARoom
 
 	private final List<WallObject> telekineticWalls = new ArrayList<>();
 	private Stack<Direction> moves = new Stack<>();
+	private NextTilesResult targetPoints;
 	private LocalPoint destination;
 	private WorldPoint location;
 	private WorldPoint finishLocation;
@@ -181,6 +184,17 @@ public class TelekineticRoom extends MTARoom
 	}
 
 	@Subscribe
+	public void onConfigChanged(ConfigChanged event)
+	{
+		// targetPoints are cached, so we need to invalidate them when the config changes
+		if (event.getGroup().equals(MTAPlugin.MTA_CONFIG_KEY))
+		{
+			targetPoints = getNextMoveTiles();
+		}
+	}
+
+
+	@Subscribe
 	public void onNpcSpawned(NpcSpawned event)
 	{
 		NPC npc = event.getNpc();
@@ -248,7 +262,6 @@ public class TelekineticRoom extends MTARoom
 
 	private void handleMovesRender(Graphics2D graphics2D)
 	{
-		NextTilesResult targetPoints = getNextMoveTiles();
 		if (targetPoints.currentTarget == null)
 		{
 			return;
@@ -377,7 +390,7 @@ public class TelekineticRoom extends MTARoom
 		}
 	}
 
-	private Stack<Direction> build()
+	private Stack<Direction> innerBuild()
 	{
 		if (guardian.getId() == MAZE_GUARDIAN_MOVING)
 		{
@@ -389,6 +402,15 @@ public class TelekineticRoom extends MTARoom
 			return build(guardian.getWorldLocation());
 		}
 	}
+
+	private Stack<Direction> build()
+	{
+		// Calculate the path to the guardian, cache the target points
+		Stack<Direction> moves = innerBuild();
+		targetPoints = getNextMoveTiles();
+		return moves;
+	}
+
 
 	private LocalPoint getGuardianDestination()
 	{

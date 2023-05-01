@@ -46,6 +46,8 @@ import net.runelite.client.ui.overlay.OverlayManager;
 )
 public class MTAPlugin extends Plugin
 {
+	public static final String MTA_CONFIG_KEY = "mta";
+
 	@Inject
 	private OverlayManager overlayManager;
 
