@@ -161,7 +161,7 @@ public class TelekineticRoom extends MTARoom
 				return;
 			}
 
-			log.debug("Updating guarding location {} -> {}", location, current);
+			log.debug("Updating guardian location {} -> {}", location, current);
 
 			location = current;
 
@@ -172,7 +172,7 @@ public class TelekineticRoom extends MTARoom
 			else
 			{
 				log.debug("Rebuilding moves due to guardian move");
-				this.moves = build();
+				buildSolution();
 			}
 
 		}
@@ -395,22 +395,26 @@ public class TelekineticRoom extends MTARoom
 		if (guardian.getId() == MAZE_GUARDIAN_MOVING)
 		{
 			WorldPoint converted = WorldPoint.fromLocal(client, getGuardianDestination());
-			return build(converted);
+			return buildSolution(converted);
 		}
 		else
 		{
-			return build(guardian.getWorldLocation());
+			return buildSolution(guardian.getWorldLocation());
 		}
 	}
 
-	private Stack<Direction> build()
+	private void buildSolution()
 	{
 		// Calculate the path to the guardian, cache the target points
-		Stack<Direction> moves = innerBuild();
-		targetPoints = getNextMoveTiles();
-		return moves;
+		this.moves = innerBuild();
+		// Cache current solution display
+		updateDisplayedTiles();
 	}
 
+	private void updateDisplayedTiles()
+	{
+		targetPoints = getNextMoveTiles();
+	}
 
 	private LocalPoint getGuardianDestination()
 	{
@@ -419,7 +423,7 @@ public class TelekineticRoom extends MTARoom
 		return neighbour(guardian.getLocalLocation(), facing);
 	}
 
-	private Stack<Direction> build(WorldPoint start)
+	private Stack<Direction> buildSolution(WorldPoint start)
 	{
 		Queue<WorldPoint> visit = new LinkedList<>();
 		Set<WorldPoint> closed = new HashSet<>();
@@ -460,10 +464,10 @@ public class TelekineticRoom extends MTARoom
 			}
 		}
 
-		return build(edges, finishLocation);
+		return buildSolution(edges, finishLocation);
 	}
 
-	private Stack<Direction> build(Map<WorldPoint, WorldPoint> edges, WorldPoint finish)
+	private Stack<Direction> buildSolution(Map<WorldPoint, WorldPoint> edges, WorldPoint finish)
 	{
 		Stack<Direction> path = new Stack<>();
 		WorldPoint current = finish;
